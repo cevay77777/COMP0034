@@ -48,12 +48,12 @@ def dash_app():
     server = app.server
 
     def run():
-        app.run(debug=False, port=8050, use_reloader=False)
+        app.run(debug=False, port=8051, use_reloader=False)
 
     t = threading.Thread(target=run, daemon=True)
     t.start()
     time.sleep(2)  # Give server time to start
-    yield "http://localhost:8050"
+    yield "http://localhost:8051"
 
 
 @pytest.fixture(scope="session")
