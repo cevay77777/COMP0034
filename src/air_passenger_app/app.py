@@ -35,6 +35,25 @@ YEAR_MAX = int(df_global["year"].max())
 
 REGION_COLOURS = px.colors.qualitative.Bold
 
+# ISO-3 codes for all countries in the dataset
+# Source: ISO 3166-1 alpha-3 standard
+COUNTRY_ISO = {
+    "Malaysia": "MYS",
+    "Indonesia": "IDN",
+    "Thailand": "THA",
+    "Philippines": "PHL",
+    "Vietnam": "VNM",
+    "Australia": "AUS",
+    "Japan": "JPN",
+    "China": "CHN",
+    "Hong Kong": "HKG",
+    "India": "IND",
+    "United Kingdom": "GBR",
+    "United States Of America": "USA",
+    "France": "FRA",
+    "Germany": "DEU",
+}
+
 # ---------------------------------------------------------------------------
 # App initialisation
 # ---------------------------------------------------------------------------
@@ -65,6 +84,10 @@ def make_filter_panel():
             ),
             html.Br(),
             html.Label("Region(s)", className="fw-semibold"),
+            html.Small(
+                "Applies to the 'By Region' tab",
+                className="text-muted d-block mb-1",
+            ),
             dcc.Dropdown(
                 id="region-dropdown",
                 options=[{"label": r, "value": r} for r in all_regions],
@@ -74,6 +97,10 @@ def make_filter_panel():
             ),
             html.Br(),
             html.Label("Country", className="fw-semibold"),
+            html.Small(
+                "Applies to the 'Country Map' tab",
+                className="text-muted d-block mb-1",
+            ),
             dcc.Dropdown(
                 id="country-dropdown",
                 options=[{"label": c, "value": c} for c in all_countries],
@@ -154,10 +181,13 @@ def render_tab(active_tab, year_range, regions, country):
     """Render the chart for the selected tab, filtered by user selections."""
     year_start, year_end = year_range
 
+    # Default to all regions if none selected
+    selected_regions = regions if regions else all_regions
+
     if active_tab == "tab-global":
         return _render_global_trend(year_start, year_end)
     elif active_tab == "tab-region":
-        return _render_region_bar(year_start, year_end, regions)
+        return _render_region_bar(year_start, year_end, selected_regions)
     elif active_tab == "tab-yoy":
         return _render_yoy(year_start, year_end)
     elif active_tab == "tab-seasonal":
@@ -183,20 +213,24 @@ def _render_global_trend(year_start, year_end):
 
 
 def _render_region_bar(year_start, year_end, regions):
-    if not regions:
-        regions = all_regions
     mask = (
         (df_region["year"] >= year_start)
         & (df_region["year"] <= year_end)
         & (df_region["region"].isin(regions))
     )
-    annual = df_region[mask].groupby(["year", "region"])["departures"].sum().reset_index()
+    filtered = df_region[mask]
+
+    if filtered.empty:
+        return html.P("No data for the selected regions and year range.",
+                      className="text-muted mt-4")
+
+    annual = filtered.groupby(["year", "region"])["departures"].sum().reset_index()
     fig = px.bar(
         annual,
         x="year",
         y="departures",
         color="region",
-        title="Annual Departures by Destination Region",
+        title=f"Annual Departures by Destination Region ({year_start}–{year_end})",
         labels={"year": "Year", "departures": "Passengers", "region": "Region"},
         color_discrete_sequence=REGION_COLOURS,
         barmode="stack",
@@ -238,7 +272,7 @@ def _render_seasonal(year_start, year_end):
         seasonal,
         x="month_name",
         y="departures",
-        title="Average Monthly Departures — Seasonal Pattern",
+        title=f"Average Monthly Departures — Seasonal Pattern ({year_start}–{year_end})",
         labels={"month_name": "Month", "departures": "Avg Passengers"},
         color="departures",
         color_continuous_scale="Blues",
@@ -256,16 +290,12 @@ def _render_map(year_start, year_end, country):
         mask &= df_country["country"] == country
     totals = df_country[mask].groupby("country")["departures"].sum().reset_index()
 
-    # Map country names to ISO-3 codes
-    # Source: ISO 3166-1 alpha-3 standard
-    country_iso = {
-        "Malaysia": "MYS", "Indonesia": "IDN", "Thailand": "THA",
-        "Philippines": "PHL", "Australia": "AUS", "Japan": "JPN",
-        "Hong Kong": "HKG", "Taiwan": "TWN", "India": "IND",
-        "United Kingdom": "GBR", "United States Of America": "USA",
-    }
-    totals["iso"] = totals["country"].map(country_iso)
+    totals["iso"] = totals["country"].map(COUNTRY_ISO)
     totals = totals.dropna(subset=["iso"])
+
+    if totals.empty:
+        return html.P("No map data available for the selected filters.",
+                      className="text-muted mt-4")
 
     fig = px.choropleth(
         totals,
@@ -276,7 +306,10 @@ def _render_map(year_start, year_end, country):
         title="Total Air Passenger Departures by Destination Country",
         labels={"departures": "Total Passengers"},
     )
-    fig.update_layout(geo=dict(showframe=False, showcoastlines=True), template="plotly_white")
+    fig.update_layout(
+        geo=dict(showframe=False, showcoastlines=True),
+        template="plotly_white",
+    )
     return dcc.Graph(figure=fig, id="country-map")
 
 

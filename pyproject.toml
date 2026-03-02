@@ -27,4 +27,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=air_dashboard --cov-report=term-missing --cov-report=html"
+addopts = "--cov=air_passenger_app --cov-report=term-missing --cov-report=html"

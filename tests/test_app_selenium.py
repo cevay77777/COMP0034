@@ -23,6 +23,9 @@ class TestPageLoad:
     def test_page_title(self, driver, dash_app):
         """The browser tab title should contain the app name."""
         driver.get(dash_app)
+        WebDriverWait(driver, 10).until(
+            lambda d: "Updating..." not in d.title
+        )
         assert "Singapore Air Passenger" in driver.title
 
     def test_heading_visible(self, driver, dash_app):
